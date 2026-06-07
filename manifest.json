@@ -19,13 +19,12 @@
     "default_title": "Toggle ClassPlus Organizer"
   },
   "background": {
-    "service_worker": "src/background/index.ts",
-    "type": "module"
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://web.classplusapp.com/*"],
-      "js": ["src/content/index.ts"],
+      "js": ["content.js"],
       "run_at": "document_start"
     }
   ],
@@ -36,10 +35,10 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/content/inject.ts",
-        "src/sidebar/index.html",
-        "src/sidebar/main.tsx",
-        "assets/*"
+        "inject.js",
+        "sidebar/index.html",
+        "sidebar/app.js",
+        "sidebar/styles.css"
       ],
       "matches": ["https://web.classplusapp.com/*"]
     }
