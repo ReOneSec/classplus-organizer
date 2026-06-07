@@ -44,6 +44,9 @@
       ],
       "resources": [
         "src/content/inject.ts",
+        "src/sidebar/index.html",
+        "src/sidebar/main.tsx",
+        "assets/*",
         "assets/index.ts-BFjpxaVC.js"
       ],
       "use_dynamic_url": false

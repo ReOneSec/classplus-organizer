@@ -35,7 +35,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/content/inject.ts"],
+      "resources": [
+        "src/content/inject.ts",
+        "src/sidebar/index.html",
+        "src/sidebar/main.tsx",
+        "assets/*"
+      ],
       "matches": ["https://web.classplusapp.com/*"]
     }
   ]
