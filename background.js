@@ -15,10 +15,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Store raw data in chrome.storage.local under the courseId
     chrome.storage.local.get([`course_${courseId}`, 'userData'], (result) => {
       const existing = result[`course_${courseId}`] || [];
-      const existingMap = new Map(existing.map((l: any) => [l.id, l]));
+      const existingMap = new Map(existing.map((l) => [l.id, l]));
       
       let added = 0;
-      lectures.forEach((l: any) => {
+      lectures.forEach((l) => {
         if (!existingMap.has(l.id)) {
           existingMap.set(l.id, l);
           added++;
