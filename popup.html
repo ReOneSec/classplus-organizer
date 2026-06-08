@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <title>ClassPlus Organizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css"/>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 1L3 7h3.5L5 11l5-6H6.5L7 1z" fill="currentColor"/>
+        </svg>
+      </div>
+      <span class="logo-name">ClassPlus <span class="logo-accent">Pro</span></span>
+    </div>
+    <div class="header-actions">
+      <div id="prog-pill">
+        <div class="prog-track"><div id="prog-fill"></div></div>
+        <span id="prog-label">0%</span>
+      </div>
+      <button id="btn-theme" class="icon-btn" title="Toggle Theme">◐</button>
+      <button id="btn-font-size" class="icon-btn" title="Font Size">Aa</button>
+      <button id="btn-refresh" class="icon-btn" title="Refresh">↻</button>
+      <button id="btn-settings" class="icon-btn" title="Settings">⋯</button>
+    </div>
+  </header>
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-inner">
+      <div class="spinner-ring"></div>
+      <div class="loading-title" id="load-title">Initializing…</div>
+      <div class="loading-sub" id="load-sub">Please wait</div>
+      <div class="load-bar-wrap" id="load-bar-wrap" style="display:none">
+        <div class="load-bar-track"><div id="load-bar-fill"></div></div>
+        <div id="load-bar-label"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NO TOKEN -->
+  <div id="screen-notoken" class="screen center-screen">
+    <div class="cs-icon">🔑</div>
+    <div class="cs-title">Open ClassPlus First</div>
+    <div class="cs-body">Navigate to your course on <code>web.classplusapp.com</code>, then return here.</div>
+    <button class="btn btn-primary" id="btn-open-cp">Open ClassPlus</button>
+    <button class="btn btn-secondary" id="btn-manual-entry">Enter Course ID</button>
+  </div>
+
+  <!-- MANUAL ENTRY -->
+  <div id="screen-manual" class="screen center-screen">
+    <div class="cs-icon">🔍</div>
+    <div class="cs-title">Enter Course ID</div>
+    <div class="cs-body">Find it in the ClassPlus URL: <code>entityId=<b>445866</b></code></div>
+    <input class="txt-input" id="manual-id-input" type="number" placeholder="e.g. 445866"/>
+    <button class="btn btn-primary" id="btn-manual-go">Fetch Lectures</button>
+    <button class="btn btn-ghost" id="btn-manual-back">← Back</button>
+  </div>
+
+  <!-- MAIN -->
+  <div id="screen-main" class="screen">
+
+    <!-- Stats Row -->
+    <div id="stats-row">
+      <div class="stat" data-tab="all">
+        <span class="stat-n" id="s-total">0</span>
+        <span class="stat-l">Total</span>
+      </div>
+      <div class="stat s-done" data-tab="all">
+        <span class="stat-n" id="s-done">0</span>
+        <span class="stat-l">Done</span>
+      </div>
+      <div class="stat s-pend" data-tab="all">
+        <span class="stat-n" id="s-pend">0</span>
+        <span class="stat-l">Left</span>
+      </div>
+      <div class="stat s-bk" data-tab="bookmarks">
+        <span class="stat-n" id="s-bk">0</span>
+        <span class="stat-l">Saved</span>
+      </div>
+      <div class="stat s-rev" data-tab="revision">
+        <span class="stat-n" id="s-rev">0</span>
+        <span class="stat-l">Revise</span>
+      </div>
+    </div>
+
+    <!-- Progress Banner -->
+    <div id="progress-banner">
+      <div class="pb-bar-track"><div id="pb-bar-fill"></div></div>
+      <div class="pb-labels">
+        <span id="pb-completed-label">Completed: 0 / 0</span>
+        <span id="pb-remaining-label">Remaining: 0</span>
+      </div>
+    </div>
+
+    <!-- Search + Jump Row -->
+    <div class="search-jump-row">
+      <div class="search-wrap">
+        <span class="search-ico">⌕</span>
+        <input id="search-input" type="text" placeholder="Search lectures, teachers…" autocomplete="off" spellcheck="false"/>
+        <button id="search-clear" class="hidden">✕</button>
+      </div>
+      <div class="jump-wrap">
+        <input id="jump-input" type="number" min="1" placeholder="#" autocomplete="off"/>
+        <div id="jump-suggestions" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="all">All</button>
+      <button class="tab" data-tab="bookmarks">Bookmarks</button>
+      <button class="tab" data-tab="revision">Revision</button>
+      <button class="tab" data-tab="recent">Recent</button>
+      <button class="tab" data-tab="range">Range</button>
+      <button class="tab" data-tab="folders">Folders</button>
+    </div>
+
+    <!-- Subject pills -->
+    <div class="pills" id="pills-row"></div>
+
+    <!-- Filter + Sort Row -->
+    <div class="filter-row">
+      <select class="mini-sel" id="flt-teacher">
+        <option value="all">All Teachers</option>
+      </select>
+      <select class="mini-sel" id="flt-dur">
+        <option value="all">Any Duration</option>
+        <option value="lt30">&lt;30m</option>
+        <option value="30-60">30–60m</option>
+        <option value="gt60">60m+</option>
+      </select>
+      <select class="mini-sel" id="flt-status">
+        <option value="all">All Status</option>
+        <option value="Not Started">Not Started</option>
+        <option value="Watching">Watching</option>
+        <option value="Completed">Completed</option>
+        <option value="Revise Later">Revise Later</option>
+      </select>
+      <span class="sort-label">Sort:</span>
+      <select class="mini-sel" id="sort-sel">
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="num-asc">Lec# ↑</option>
+        <option value="num-desc">Lec# ↓</option>
+        <option value="dur-hi">Longest</option>
+        <option value="dur-lo">Shortest</option>
+        <option value="alpha">A–Z</option>
+      </select>
+    </div>
+
+    <!-- Results count + continue watching -->
+    <div id="results-bar">
+      <span id="results-count"></span>
+      <button id="btn-continue" class="hidden">▶ Continue</button>
+    </div>
+
+    <!-- Range Navigation Panel (shown when tab=range) -->
+    <div id="range-panel" class="hidden">
+      <div class="range-controls">
+        <button class="range-dir-btn active" id="range-fwd">Forward ↓</button>
+        <button class="range-dir-btn" id="range-rev">Reverse ↑</button>
+      </div>
+      <div id="range-chips"></div>
+    </div>
+
+    <!-- Lecture list -->
+    <div class="lec-list" id="lec-list"></div>
+
+    <!-- Folders view -->
+    <div id="folders-view" class="hidden" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0">
+      <div class="folders-hdr">
+        <span>Folders</span>
+        <button class="btn btn-ghost" id="btn-new-folder" style="margin:0;padding:2px 8px;font-size:10px">+ New</button>
+      </div>
+      <div id="folders-list" style="overflow-y:auto;flex:1"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state hidden" id="empty-state">
+      <div class="ei">○</div>
+      <div class="et">No lectures found</div>
+      <div class="eb">Try adjusting filters or search</div>
+    </div>
+
+  </div><!-- /screen-main -->
+
+  <!-- SETTINGS -->
+  <div id="screen-settings" class="screen">
+    <div class="sub-header">
+      <button class="icon-btn" id="btn-settings-back">←</button>
+      <span class="sub-title">Settings</span>
+    </div>
+    <div class="settings-body">
+      <div class="settings-section-title">Session</div>
+      <div class="set-section">
+        <div class="set-label">Course ID</div>
+        <div class="set-val mono" id="set-entity">—</div>
+      </div>
+      <div class="set-section">
+        <div class="set-label">Token Status</div>
+        <div class="set-val" id="set-token">—</div>
+      </div>
+      <div class="set-section">
+        <div class="set-label">Cached Lectures</div>
+        <div class="set-val" id="set-cached">—</div>
+      </div>
+      <div class="set-section">
+        <div class="set-label">Last Fetched</div>
+        <div class="set-val" id="set-fetched">—</div>
+      </div>
+
+      <div class="set-divider"></div>
+      <div class="settings-section-title">Display</div>
+
+      <div class="set-section">
+        <div class="set-label">Theme</div>
+        <div class="set-toggle-row">
+          <button class="toggle-opt" data-pref="theme" data-val="dark" id="theme-dark">Dark</button>
+          <button class="toggle-opt" data-pref="theme" data-val="light" id="theme-light">Light</button>
+          <button class="toggle-opt" data-pref="theme" data-val="auto" id="theme-auto">Auto</button>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <div class="set-label">Font Size</div>
+        <div class="set-toggle-row">
+          <button class="toggle-opt" data-pref="fontSize" data-val="small" id="fs-small">Small</button>
+          <button class="toggle-opt active" data-pref="fontSize" data-val="medium" id="fs-medium">Medium</button>
+          <button class="toggle-opt" data-pref="fontSize" data-val="large" id="fs-large">Large</button>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <div class="set-label">High Contrast</div>
+        <div class="set-toggle-row">
+          <button class="toggle-opt" data-pref="contrast" data-val="normal" id="contrast-normal">Normal</button>
+          <button class="toggle-opt" data-pref="contrast" data-val="high" id="contrast-high">High</button>
+        </div>
+      </div>
+
+      <div class="set-divider"></div>
+
+      <button class="btn btn-secondary btn-full" id="btn-refetch">↻ Re-fetch All Lectures</button>
+      <button class="btn btn-secondary btn-full" id="btn-change-course">⊙ Change Course ID</button>
+      <button class="btn btn-danger btn-full" id="btn-clear">✕ Clear All Data</button>
+      <div class="set-footer">All data stored locally · v2.0.0</div>
+    </div>
+  </div>
+
+  <!-- FOLDER DETAIL -->
+  <div id="screen-folder" class="screen">
+    <div class="sub-header">
+      <button class="icon-btn" id="btn-folder-back">←</button>
+      <span class="sub-title" id="folder-detail-title"></span>
+      <button class="icon-btn" id="btn-folder-del" title="Delete folder" style="color:var(--red)">✕</button>
+    </div>
+    <div class="lec-list" id="folder-lec-list"></div>
+    <div class="empty-state hidden" id="folder-empty">
+      <div class="ei">📂</div>
+      <div class="et">Folder is empty</div>
+      <div class="eb">Right-click a lecture to add it here</div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu hidden" id="ctx-menu">
+  <div class="ctx-item" data-action="open">▶ Open Lecture</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="bookmark">☆ Toggle Bookmark</div>
+  <div class="ctx-item" data-action="status">○ Change Status</div>
+  <div class="ctx-item" data-action="tag">◈ Set Subject Tag</div>
+  <div class="ctx-item" data-action="folder">⊞ Move to Folder</div>
+</div>
+
+<!-- STATUS PICKER -->
+<div class="picker hidden" id="picker-status">
+  <div class="picker-hdr">Status</div>
+  <div class="picker-opt" data-val="Not Started">Not Started</div>
+  <div class="picker-opt" data-val="Watching">Watching</div>
+  <div class="picker-opt" data-val="Completed">Completed</div>
+  <div class="picker-opt" data-val="Revise Later">Revise Later</div>
+</div>
+
+<!-- TAG PICKER -->
+<div class="picker hidden" id="picker-tag">
+  <div class="picker-hdr">Subject Tag</div>
+  <div class="picker-opt" data-val="English">English</div>
+  <div class="picker-opt" data-val="CDP">CDP</div>
+  <div class="picker-opt" data-val="EVS">EVS</div>
+  <div class="picker-opt" data-val="Reasoning">Reasoning</div>
+  <div class="picker-opt" data-val="Math">Math</div>
+  <div class="picker-opt" data-val="Pedagogy">Pedagogy</div>
+  <div class="picker-opt" data-val="GK">GK</div>
+  <div class="picker-opt" data-val="">Remove Tag</div>
+</div>
+
+<!-- FOLDER PICKER -->
+<div class="picker hidden" id="picker-folder">
+  <div class="picker-hdr">Folder</div>
+  <div id="picker-folder-opts"></div>
+  <div class="picker-opt" data-val="__new__">+ New Folder…</div>
+  <div class="picker-opt" data-val="">Remove from Folder</div>
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay hidden" id="overlay"></div>
+
+<script src="storage.js"></script>
+<script src="fuse.min.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

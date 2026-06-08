@@ -1,121 +1,119 @@
-// ============================================================
-// ClassPlus Organizer — Content Script
-// ============================================================
+// content.js — ClassPlus Organizer
+// Runs inside web.classplusapp.com — handles entity detection and pending lecture clicks
 
-const INTERCEPT_MESSAGE_TYPE = 'CLASSPLUS_ORGANIZER_INTERCEPT';
+(function () {
+  'use strict';
 
-function injectScript() {
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('inject.js');
-  (document.head || document.documentElement).appendChild(script);
-  script.onload = () => script.remove();
-}
+  // ── Entity ID detection ──────────────────────────────────────────────────
+  function extractEntityId(url) {
+    const patterns = [/entityId=(\d+)/, /\/course\/(\d+)/, /\/batch\/(\d+)/, /courseId=(\d+)/, /batchId=(\d+)/];
+    for (const p of patterns) { const m = url.match(p); if (m) return m[1]; }
+    return null;
+  }
 
-injectScript();
+  function reportEntity() {
+    const id = extractEntityId(window.location.href);
+    if (id) chrome.storage.local.set({ lastEntityId: id });
+  }
 
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return;
-  if (event.data?.type !== INTERCEPT_MESSAGE_TYPE) return;
+  reportEntity();
 
-  chrome.runtime.sendMessage({
-    type: 'LECTURES_RECEIVED',
-    payload: event.data.payload,
+  // Watch SPA navigation
+  let lastUrl = location.href;
+  new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      reportEntity();
+      checkPendingLecture();
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+
+  // Also intercept XHR to capture entityId from API calls
+  const origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    const id = extractEntityId(url);
+    if (id) chrome.storage.local.set({ lastEntityId: id });
+    return origOpen.apply(this, arguments);
+  };
+
+  // ── Pending lecture auto-click ───────────────────────────────────────────
+  // When background.js can't DOM-click immediately (recordings list not loaded),
+  // it stores a pendingLecture. We watch for the recordings list to appear and click it.
+
+  function tryClickPending(liveSessionId, lectureId, lectureName) {
+    // Try data attributes first
+    const attrs = [
+      `[data-id="${liveSessionId}"]`,
+      `[data-session-id="${liveSessionId}"]`,
+      `[data-live-session-id="${liveSessionId}"]`,
+      `[data-content-id="${lectureId}"]`,
+    ];
+    for (const sel of attrs) {
+      const el = document.querySelector(sel);
+      if (el) { el.click(); return true; }
+    }
+
+    // Try thumbnail image src match
+    const imgs = document.querySelectorAll(`img[src*="${liveSessionId}"]`);
+    if (imgs.length) {
+      const card = imgs[0].closest('[class*="card"],[class*="item"],[class*="video"],[class*="recording"],li') || imgs[0].parentElement;
+      if (card) { card.click(); return true; }
+    }
+
+    // Try text match
+    const nameLower = (lectureName || '').toLowerCase().slice(0, 25);
+    if (nameLower) {
+      const candidates = document.querySelectorAll(
+        '[class*="record"],[class*="video"],[class*="lecture"],[class*="session"],[class*="card"],[class*="class"]'
+      );
+      for (const el of candidates) {
+        if (el.textContent.toLowerCase().includes(nameLower)) {
+          const btn = el.querySelector('button,a,[role="button"]') || el;
+          btn.click();
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  async function checkPendingLecture() {
+    const data = await new Promise(r => chrome.storage.local.get(['pendingLecture'], r));
+    const p = data.pendingLecture;
+    if (!p) return;
+    if (Date.now() - p.ts > 30000) { // stale after 30s
+      chrome.storage.local.remove('pendingLecture');
+      return;
+    }
+
+    const clicked = tryClickPending(p.liveSessionId, p.lectureId, p.lectureName);
+    if (clicked) {
+      chrome.storage.local.remove('pendingLecture');
+    }
+  }
+
+  // Check on load
+  checkPendingLecture();
+
+  // Also watch for DOM changes — recordings list may load async
+  let pendingObserver = null;
+  chrome.storage.local.get(['pendingLecture'], (data) => {
+    if (!data.pendingLecture) return;
+
+    let attempts = 0;
+    pendingObserver = new MutationObserver(() => {
+      attempts++;
+      if (attempts > 200) { pendingObserver?.disconnect(); return; } // give up after ~20s
+      checkPendingLecture().then(done => { if (done) pendingObserver?.disconnect(); });
+    });
+    pendingObserver.observe(document.body, { childList: true, subtree: true });
   });
-});
 
-let sidebarContainer = null;
-let sidebarVisible = false;
+  // Listen from popup
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'PING') sendResponse({ alive: true, url: location.href });
+    if (msg.type === 'GET_ENTITY') sendResponse({ entityId: extractEntityId(location.href) });
+  });
 
-function createSidebar() {
-  if (sidebarContainer) return;
-
-  sidebarContainer = document.createElement('div');
-  sidebarContainer.id = 'classplus-organizer-root';
-  document.body.appendChild(sidebarContainer);
-
-  const shadow = sidebarContainer.attachShadow({ mode: 'open' });
-
-  const iframe = document.createElement('iframe');
-  iframe.src = chrome.runtime.getURL('sidebar/index.html');
-  iframe.id = 'classplus-organizer-iframe';
-  iframe.setAttribute('allowtransparency', 'true');
-
-  const style = document.createElement('style');
-  style.textContent = `
-    :host {
-      all: initial;
-      position: fixed;
-      top: 0;
-      right: 0;
-      width: 420px;
-      height: 100vh;
-      z-index: 2147483647;
-      pointer-events: none;
-      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-    }
-    :host(.visible) {
-      pointer-events: auto;
-    }
-    #classplus-organizer-iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: transparent;
-      transform: translateX(100%);
-      transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
-      box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
-    }
-    :host(.visible) #classplus-organizer-iframe {
-      transform: translateX(0);
-    }
-    .backdrop {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(0, 0, 0, 0);
-      transition: background 300ms ease;
-      pointer-events: none;
-    }
-    :host(.visible) .backdrop {
-      background: rgba(0, 0, 0, 0.3);
-      pointer-events: auto;
-    }
-  `;
-
-  const backdrop = document.createElement('div');
-  backdrop.className = 'backdrop';
-  backdrop.addEventListener('click', () => toggleSidebar(false));
-
-  shadow.appendChild(style);
-  shadow.appendChild(backdrop);
-  shadow.appendChild(iframe);
-}
-
-function toggleSidebar(forceState) {
-  if (!sidebarContainer) createSidebar();
-  sidebarVisible = forceState !== undefined ? forceState : !sidebarVisible;
-  if (sidebarVisible) {
-    sidebarContainer.shadowRoot.host.classList.add('visible');
-  } else {
-    sidebarContainer.shadowRoot.host.classList.remove('visible');
-  }
-}
-
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'TOGGLE_SIDEBAR') toggleSidebar();
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.shiftKey && e.key === 'O') {
-    e.preventDefault();
-    toggleSidebar();
-  }
-});
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', createSidebar);
-} else {
-  createSidebar();
-}
+})();
